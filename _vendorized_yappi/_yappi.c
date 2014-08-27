@@ -285,7 +285,15 @@ static _ctx *
 _thread2ctx(PyThreadState *ts)
 {
     _hitem *it;
-    it = hfind(contexts, _current_context_id(ts));
+    uintptr_t ctx_id;
+    
+    ctx_id = _current_context_id(ts);
+
+    if (ctx_id == -1) {
+        return NULL;
+    }
+
+    it = hfind(contexts, ctx_id);
     if (!it) {
         // callback functions in some circumtances, can be called before the context entry is not
         // created. (See issue 21). To prevent this problem we need to ensure the context entry for
@@ -735,8 +743,7 @@ _yapp_callback(PyObject *self, PyFrameObject *frame, int what,
     
     // get current ctx
     current_ctx = _thread2ctx(frame->f_tstate);
-    if (!current_ctx) {
-        _log_err(9);
+    if (!current_ctx) {        
         goto finally;
     }
     
@@ -796,12 +803,16 @@ _profile_thread(PyThreadState *ts)
     _ctx *ctx;
     _hitem *it;
 
+    ctx_id = _current_context_id(ts);
+    if (ctx_id == -1) {
+        return NULL;
+    }
+
     ctx = _create_ctx();
     if (!ctx) {
         return NULL;
     }
-    
-    ctx_id = _current_context_id(ts);
+        
     it = hfind(contexts, ctx_id);
     if (!it) {
         if (!hadd(contexts, ctx_id, (uintptr_t)ctx)) {

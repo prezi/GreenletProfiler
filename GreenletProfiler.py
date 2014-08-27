@@ -15,7 +15,22 @@ __all__ = [
     'convert2pstats',
 ]
 
-def start(builtins=False, profile_threads=True):
+def fixed_to_current():
+    """Callback usable in start's overridden_callback parameter to fix profiling to the 
+    current greenlet
+    """    
+    
+    fixed_to = greenlet.getcurrent()
+
+    def check():
+        current = greenlet.getcurrent()
+        if current == fixed_to:
+            return id(current)
+        else:
+            return -1
+    return check
+
+def start(builtins=False, profile_threads=True, overridden_callback=None):
     """Starts profiling all threads and all greenlets.
 
     This function can be called from any thread at any time.
@@ -27,7 +42,7 @@ def start(builtins=False, profile_threads=True):
     """
     # TODO: what about builtins False or profile_threads False?
     _vendorized_yappi.yappi.set_context_id_callback(
-        lambda: greenlet and id(greenlet.getcurrent()) or 0)
+        overridden_callback if overridden_callback is not None else lambda: greenlet and id(greenlet.getcurrent()) or 0)
 
     _vendorized_yappi.yappi.set_context_name_callback(
         lambda: greenlet and greenlet.getcurrent().__class__.__name__ or '')
