@@ -482,27 +482,14 @@ class YFuncStats(YStats):
         for saved_stat in saved_stats:
             saved_stat_in_curr = self[saved_stat.full_name]            
             saved_stat_in_curr += saved_stat
-                        
-    def _save_as_YSTAT(self, path):
-        file = open(path, "wb")
-        try:
-            pickle.dump((self._stats, self._clock_type), file, YPICKLE_PROTOCOL)
-        finally:
-            file.close()
-            
-    def _save_as_PSTAT(self, path):   
-        """
-        Save the profiling information as PSTAT.
-        """
-        _stats = convert2pstats(self)
-        _stats.dump_stats(path)
-            
-    def _save_as_CALLGRIND(self, path):
-        """
-        Writes all the function stats in a callgrind-style format to the given
-        file. (stdout by default)
-        """
-            
+
+    def _to_text_as_YSTAT(self):
+        raise NotImplemented()
+
+    def _to_text_as_PSTAT(self):
+        raise NotImplemented()
+
+    def _to_text_as_CALLGRIND(self):
         header = """version: 1\ncreator: %s\npid: %d\ncmd:  %s\npart: 1\n\nevents: Ticks""" % \
             ('yappi', os.getpid(), ' '.join(sys.argv))
 
@@ -532,10 +519,31 @@ class YFuncStats(YStats):
                                 '0 %d' % int(child.ttot * 1e6)
                                 ]
             lines += func_stats
+
+        return '\n'.join(lines)
+                        
+    def _save_as_YSTAT(self, path):
+        file = open(path, "wb")
+        try:
+            pickle.dump((self._stats, self._clock_type), file, YPICKLE_PROTOCOL)
+        finally:
+            file.close()
             
+    def _save_as_PSTAT(self, path):   
+        """
+        Save the profiling information as PSTAT.
+        """
+        _stats = convert2pstats(self)
+        _stats.dump_stats(path)
+            
+    def _save_as_CALLGRIND(self, path):
+        """
+        Writes all the function stats in a callgrind-style format to the given
+        file. (stdout by default)
+        """
         file = open(path, "w")
         try:
-            file.write('\n'.join(lines))                
+            file.write(self._to_text_as_CALLGRIND())
         finally:
             file.close()
             
@@ -562,6 +570,14 @@ class YFuncStats(YStats):
                     
         save_func = getattr(self, "_save_as_%s" % (type))
         save_func(path=path)
+
+    def to_text(self, type="ystat"):
+        type = type.upper()
+        if type not in self._SUPPORTED_SAVE_FORMATS:
+            raise NotImplementedError('Saving in "%s" format is not possible currently.' % (type))
+
+        save_func = getattr(self, "_to_text_as_%s" % (type))
+        return save_func()
         
     def print_all(self, out=sys.stdout):
         """
